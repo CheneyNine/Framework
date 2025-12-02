@@ -1,0 +1,25 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.env
+.venv
+env.bak/
+venv.bak/
+
+# Logs
+logs/
+*.log
+
+# Data
+dataset/
+*.npy
+*.npz
+*.pkl
+
+# IDE
+.vscode/
+.idea/

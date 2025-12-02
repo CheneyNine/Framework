@@ -1,0 +1,3 @@
+model:
+  name: STGCN
+  hidden_channels: 64
