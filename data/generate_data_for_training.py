@@ -3,114 +3,114 @@ import argparse
 import numpy as np
 import pandas as pd
 
-class StandardScaler():
-    def __init__(self, mean, std):
-        self.mean = mean
-        self.std = std
-
-    def transform(self, data):
-        return (data - self.mean) / self.std
-
-    def inverse_transform(self, data):
-        return (data * self.std) + self.mean
-
-
-def generate_data_and_idx(data, x_offsets, y_offsets,
-                          add_time_of_day=True,
-                          add_day_of_week=True):
-    """
-    data: np.ndarray, shape (num_samples, num_nodes, feature_dim)
-    timestamps: pd.DatetimeIndex, len == num_samples
-    """
-    # 1. 基本形状
-    data = np.asarray(data)
+def generate_data(args):
+    # 1. Load Data
+    data_path = '/root/code/Framework/dataset/sacramento_data.npy'
+    if not os.path.exists(data_path):
+        raise FileNotFoundError(f"Data file not found: {data_path}")
+    
+    data = np.load(data_path)
+    print(f"Original data shape: {data.shape}") # (105120, 517, 4)
+    
     num_samples, num_nodes, feature_dim = data.shape
-    # 设定起始时间和频率
-    start_time = '2023-01-01 00:00:00'
-    freq = '5T'  # "T" = minute，'5T' 表示每5分钟一个点
-    periods = 365 * 24 * 60 // 5  # 一年 365 天，每小时 60 分钟，每 5 分钟一个点
-    # 构造时间索引
-    datetime_index = pd.date_range(start=start_time, periods=periods, freq=freq)
-    print(datetime_index[:5])
-    print(f"总时间步数: {len(datetime_index)}")
+    
+    # 2. Create Time Index (Assuming 2023-01-01 start, 5min freq)
+    # Adjust this if the actual start time is different
+    full_start_time = '2023-01-01 00:00:00'
+    freq = '5T'
+    datetime_index = pd.date_range(start=full_start_time, periods=num_samples, freq=freq)
+    
+    # 3. Filter by Date
+    start_date = pd.Timestamp(args.start_date)
+    end_date = pd.Timestamp(args.end_date) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1) # Include the end date fully
+    
+    mask = (datetime_index >= start_date) & (datetime_index <= end_date)
+    data = data[mask]
+    datetime_index = datetime_index[mask]
+    
+    print(f"Filtered data shape ({args.start_date} to {args.end_date}): {data.shape}")
+    
+    if len(data) == 0:
+        raise ValueError("No data selected. Check your start_date and end_date.")
 
-    # 示例：将第一个节点的数据变成 DataFrame（可扩展成多节点）
-    df = pd.DataFrame(data[:, 0, :], index=datetime_index, columns=[f"feat_{i}" for i in range(4)])
-    print(df.head())
-
+    # 4. Add Features (Time of Day, Day of Week)
     feature_list = [data]
-    if add_time_of_day:
-        time_ind = (df.index.values - df.index.values.astype('datetime64[D]')) / np.timedelta64(1, 'D')
+    
+    if args.tod:
+        # Time of day: normalized to [0, 1]
+        time_ind = (datetime_index.values - datetime_index.values.astype('datetime64[D]')) / np.timedelta64(1, 'D')
         time_of_day = np.tile(time_ind, [1, num_nodes, 1]).transpose((2, 1, 0))
         feature_list.append(time_of_day)
-    if add_day_of_week:
-        dow = df.index.dayofweek
+        
+    if args.dow:
+        # Day of week: normalized to [0, 1]
+        dow = datetime_index.dayofweek
         dow_tiled = np.tile(dow, [1, num_nodes, 1]).transpose((2, 1, 0))
         day_of_week = dow_tiled / 7
         feature_list.append(day_of_week)
 
     data = np.concatenate(feature_list, axis=-1)
-    print('data shape after feature concat:', data.shape)
+    print(f"Data shape after feature engineering: {data.shape}")
 
-    min_t = abs(min(x_offsets))
-    max_t = abs(num_samples - abs(max(y_offsets)))  # Exclusive
-    print('idx min & max:', min_t, max_t)
-    idx = np.arange(min_t, max_t, 1)
-    return data, idx
-
-
-
-def generate_train_val_test(args):
-    years = args.years.split('_')
-    data=np.load('/root/code/Framework/dataset/sacramento_data.npy')
-    print('original data shape:', data.shape) # (105120, 517, 4)
-    # 筛选前面8928个时间点
-    # data = data[:8928,:,:]
-    print('data shape after year filter:', data.shape)
-
-    seq_length_x, seq_length_y = args.seq_length_x, args.seq_length_y
-    x_offsets = np.arange(-(seq_length_x - 1), 1, 1)
-    y_offsets = np.arange(1, (seq_length_y + 1), 1)
-
-    data, idx = generate_data_and_idx(data, x_offsets, y_offsets, args.tod, args.dow)
-    print('final data shape:', data.shape, 'idx shape:', idx.shape)
-    out_dir = args.dataset + '/' + args.years
-
-    # np.save(os.path.join(out_dir, 'data_no_normalization'), data)
-    num_samples = len(idx)
+    # 5. Split Data (Train/Val/Test)
+    num_samples = len(data)
     num_train = round(num_samples * 0.6)
-    num_val = round(num_samples * 0.2)   
+    num_val = round(num_samples * 0.2)
+    num_test = num_samples - num_train - num_val
 
-    # split idx
-    idx_train = idx[:num_train]
-    idx_val = idx[num_train: num_train + num_val]
-    idx_test = idx[num_train + num_val:]
+    train_data = data[:num_train]
+    val_data = data[num_train: num_train + num_val]
+    test_data = data[num_train + num_val:]
+    
+    train_time = datetime_index[:num_train]
+    val_time = datetime_index[num_train: num_train + num_val]
+    test_time = datetime_index[num_train + num_val:]
 
-    # normalize
-    x_train = data[:idx_val[0] - args.seq_length_x, :, 0] 
-    scaler = StandardScaler(mean=x_train.mean(), std=x_train.std())
-    data[..., 0] = scaler.transform(data[..., 0])
-
-    # save
-    out_dir = '/root/code/Framework/dataset'
+    # 6. Save Data
+    out_dir = os.path.join('/root/code/Framework/dataset', args.output_dir)
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
-    np.savez_compressed(os.path.join(out_dir, 'his.npz'), data=data, mean=scaler.mean, std=scaler.std)
+        
+    # Node indices (0 to num_nodes-1)
+    node_idx = np.arange(num_nodes)
+    
+    # Helper to save in Taxi_Chicago format but with extra feature dim
+    def save_split(filename, data_split, time_split):
+        save_path = os.path.join(out_dir, filename)
+        # Convert timestamps to string format for compatibility if needed, or keep as is.
+        # Taxi_Chicago uses strings like '2019-01-01 00:00:00'
+        time_str = time_split.strftime('%Y-%m-%d %H:%M:%S').values.astype(str)
+        
+        np.savez_compressed(
+            save_path,
+            data=data_split,
+            index=node_idx,
+            start_time=time_str
+        )
+        print(f"Saved {save_path}: data={data_split.shape}")
 
-    np.save(os.path.join(out_dir, 'idx_train'), idx_train)
-    np.save(os.path.join(out_dir, 'idx_val'), idx_val)
-    np.save(os.path.join(out_dir, 'idx_test'), idx_test)
-    print('data and idx saved to', out_dir)
-
+    save_split(f'{args.dataset_name}_train.npz', train_data, train_time)
+    save_split(f'{args.dataset_name}_val.npz', val_data, val_time)
+    save_split(f'{args.dataset_name}_test.npz', test_data, test_time)
+    
+    # Also save the adjacency matrix if it exists in the source folder to the new folder
+    # Assuming source adj is 'dataset/Sacra/sacramento_adj_gaussian.npy'
+    src_adj = '/root/code/Framework/dataset/Sacra/sacramento_adj_gaussian.npy'
+    if os.path.exists(src_adj):
+        dst_adj = os.path.join(out_dir, f'{args.dataset_name}_adj.npy')
+        import shutil
+        shutil.copy(src_adj, dst_adj)
+        print(f"Copied adjacency matrix to {dst_adj}")
 
 if __name__ == '__main__':
+    # How to use: python data/generate_data_for_training.py --start_date 2023-01-01 --end_date 2023-01-31 --output_dir Sacra_Jan2023 --dataset_name Sacra_Jan
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset', type=str, default='ca', help='dataset name')
-    parser.add_argument('--years', type=str, default='2019', help='if use data from multiple years, please use underline to separate them, e.g., 2018_2019')
-    parser.add_argument('--seq_length_x', type=int, default=12, help='sequence Length')
-    parser.add_argument('--seq_length_y', type=int, default=12, help='sequence Length')
-    parser.add_argument('--tod', type=int, default=1, help='time of day')
-    parser.add_argument('--dow', type=int, default=1, help='day of week')
+    parser.add_argument('--dataset_name', type=str, default='Sacra_New', help='Output dataset name prefix')
+    parser.add_argument('--output_dir', type=str, default='Sacra_New', help='Output directory name inside dataset/')
+    parser.add_argument('--start_date', type=str, default='2023-01-01', help='Start date (YYYY-MM-DD)')
+    parser.add_argument('--end_date', type=str, default='2023-12-31', help='End date (YYYY-MM-DD)')
+    parser.add_argument('--tod', type=int, default=1, help='Add time of day feature (1/0)')
+    parser.add_argument('--dow', type=int, default=1, help='Add day of week feature (1/0)')
     
     args = parser.parse_args()
-    generate_train_val_test(args)
+    generate_data(args)
