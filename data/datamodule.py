@@ -70,6 +70,7 @@ class MultiDataModule(L.LightningDataModule):
 
             if stage == 'fit' or stage is None:
                 train_raw = np.load(config['train_path'])['data'].astype(np.float32)
+                print(f"Dataset {name} - Train data shape: {train_raw.shape}")
                 scaler = StandardScaler()
                 train_norm = scaler.fit_transform(train_raw)
                 self.scalers.append(scaler)
@@ -83,6 +84,7 @@ class MultiDataModule(L.LightningDataModule):
                 )
 
                 val_raw = np.load(config['val_path'])['data'].astype(np.float32)
+                print(f"Dataset {name} - Val data shape: {val_raw.shape}")
                 val_norm = scaler.transform(val_raw)
                 self.val_datasets.append(
                     MultimodalDataset(data=val_norm, **dataset_common_args)
@@ -102,6 +104,7 @@ class MultiDataModule(L.LightningDataModule):
                     self.scalers.append(scaler)
 
                 test_raw = np.load(config['test_path'])['data'].astype(np.float32)
+                print(f"Dataset {name} - Test data shape: {test_raw.shape}")
                 test_norm = scaler.transform(test_raw)
                 self.test_datasets.append(
                     MultimodalDataset(data=test_norm, **dataset_common_args)
