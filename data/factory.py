@@ -22,6 +22,16 @@ def get_dataset_paths(dataset_name: str, root_dir: str = './dataset'):
             'test_idx': os.path.join(dataset_dir, 'idx_test.npy'),
             'modal_paths': {}
         })
+    elif dataset_name == 'Sacra_Jan':
+        dataset_dir = os.path.join(root_dir, 'Sacra_Jan2023')
+        base_prefix = 'Sacra_Jan'
+        config.update({
+            'adj_path': os.path.join(dataset_dir, f'{base_prefix}_adj.npy'),
+            'train_path': os.path.join(dataset_dir, f'{base_prefix}_train.npz'),
+            'val_path': os.path.join(dataset_dir, f'{base_prefix}_val.npz'),
+            'test_path': os.path.join(dataset_dir, f'{base_prefix}_test.npz'),
+            'modal_paths': {}
+        })
     else:
         raise ValueError(f"Unknown dataset name: {dataset_name}. Please add path config in data/factory.py")
     return config

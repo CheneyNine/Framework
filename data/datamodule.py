@@ -72,7 +72,13 @@ class MultiDataModule(L.LightningDataModule):
                 train_raw = np.load(config['train_path'])['data'].astype(np.float32)
                 print(f"Dataset {name} - Train data shape: {train_raw.shape}")
                 scaler = StandardScaler()
-                train_norm = scaler.fit_transform(train_raw)
+                
+                if train_raw.ndim == 3:
+                    T, N, F = train_raw.shape
+                    train_norm = scaler.fit_transform(train_raw.reshape(-1, F)).reshape(T, N, F)
+                else:
+                    train_norm = scaler.fit_transform(train_raw)
+                    
                 self.scalers.append(scaler)
 
                 if rank == 0:
@@ -85,7 +91,13 @@ class MultiDataModule(L.LightningDataModule):
 
                 val_raw = np.load(config['val_path'])['data'].astype(np.float32)
                 print(f"Dataset {name} - Val data shape: {val_raw.shape}")
-                val_norm = scaler.transform(val_raw)
+                
+                if val_raw.ndim == 3:
+                    T, N, F = val_raw.shape
+                    val_norm = scaler.transform(val_raw.reshape(-1, F)).reshape(T, N, F)
+                else:
+                    val_norm = scaler.transform(val_raw)
+                    
                 self.val_datasets.append(
                     MultimodalDataset(data=val_norm, **dataset_common_args)
                 )
@@ -98,14 +110,23 @@ class MultiDataModule(L.LightningDataModule):
                 if scaler is None:
                     train_raw_for_fit = np.load(config['train_path'])['data'].astype(np.float32)
                     scaler = StandardScaler()
-                    scaler.fit(train_raw_for_fit)
+                    if train_raw_for_fit.ndim == 3:
+                        scaler.fit(train_raw_for_fit.reshape(-1, train_raw_for_fit.shape[-1]))
+                    else:
+                        scaler.fit(train_raw_for_fit)
 
                 if not any(s == scaler for s in self.scalers):
                     self.scalers.append(scaler)
 
                 test_raw = np.load(config['test_path'])['data'].astype(np.float32)
                 print(f"Dataset {name} - Test data shape: {test_raw.shape}")
-                test_norm = scaler.transform(test_raw)
+                
+                if test_raw.ndim == 3:
+                    T, N, F = test_raw.shape
+                    test_norm = scaler.transform(test_raw.reshape(-1, F)).reshape(T, N, F)
+                else:
+                    test_norm = scaler.transform(test_raw)
+                    
                 self.test_datasets.append(
                     MultimodalDataset(data=test_norm, **dataset_common_args)
                 )

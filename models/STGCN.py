@@ -45,6 +45,11 @@ class STGCN(BaseModel):
         self.fully_connected = nn.Linear(data_module.num_timesteps_input, data_module.num_timesteps_output)
 
     def forward(self, x, adj):
+        # Handle 5D input (batch, features, 1, nodes, time) -> (batch, nodes, 1, time)
+        if x.dim() == 5:
+            x = x[:, 0, :, :, :] # Take first feature -> (batch, 1, nodes, time)
+            x = x.permute(0, 2, 1, 3) # -> (batch, nodes, 1, time)
+
         x = self.st_conv1(x, adj)
         x = self.st_conv2(x, adj)
         x = x.permute(0, 2, 1, 3)

@@ -60,6 +60,12 @@ class BaseModel(L.LightningModule):
 
     def _get_reals_and_preds(self, batch):
         x, y, adj = batch[:3]
+        
+        # Handle 5D y (batch, features, 1, nodes, time) -> (batch, nodes, 1, time)
+        if y.dim() == 5:
+             y = y[:, 0, :, :, :] # (batch, 1, nodes, time)
+             y = y.permute(0, 2, 1, 3) # (batch, nodes, 1, time)
+
         y_hat = self.forward(x, adj)
         return y, y_hat
 
@@ -67,8 +73,24 @@ class BaseModel(L.LightningModule):
         original_shape = data.shape
         device = data.device
         data_np = data.cpu().numpy().squeeze()
+        # Handle case where squeeze removes too many dims if nodes=1 or time=1?
+        # Assuming (batch, nodes, 1, time) -> (batch, nodes, time)
+        if data_np.ndim == 2: # If batch=1 or something
+             pass 
+             
         data_reshaped = data_np.transpose(0, 2, 1).reshape(-1, original_shape[1])
-        unscaled_data_reshaped = scaler.inverse_transform(data_reshaped)
+        
+        # Check if scaler features match nodes (Taxi style) or not (Sacra style)
+        if hasattr(scaler, 'n_features_in_') and scaler.n_features_in_ != original_shape[1]:
+             # Sacra style: scaler is (features,), data is (batch*time, nodes)
+             # We assume we are predicting the first feature
+             mean = scaler.mean_[0]
+             std = scaler.scale_[0]
+             unscaled_data_reshaped = data_reshaped * std + mean
+        else:
+             # Taxi style: scaler is (nodes,), data is (batch*time, nodes)
+             unscaled_data_reshaped = scaler.inverse_transform(data_reshaped)
+             
         unscaled_data_np = unscaled_data_reshaped.reshape(original_shape[0], original_shape[-1], original_shape[1])
         unscaled_data_np = unscaled_data_np.transpose(0, 2, 1)
         return torch.from_numpy(unscaled_data_np).unsqueeze(2).to(device)

@@ -1,0 +1,26 @@
+project:
+  seed: 42
+  accelerator: 'gpu'
+  gpus: "0"
+  matmul_precision: 'medium'
+
+data:
+  root_dir: './dataset'
+  datasets: ['Sacra_Jan']
+  batch_size: 32
+  num_workers: 4
+  history_seq_len: 12
+  future_seq_len: 12
+  stride: 1
+
+train:
+  max_epochs: 2
+  patience: 5
+  optimizer:
+    name: Adam
+    lr: 0.001
+    weight_decay: 0.0001
+  scheduler:
+    name: ReduceLROnPlateau
+    patience: 5
+    monitor: 'val_loss'
