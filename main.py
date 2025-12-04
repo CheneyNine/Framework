@@ -1,6 +1,8 @@
 import lightning as L
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping
 from lightning.pytorch.loggers import CSVLogger
+import swanlab
+from utils.swanlab_logger import SwanLabLogger
 import argparse
 import os
 import torch
@@ -28,6 +30,18 @@ def main(args):
     logger_name = f"{model_name}_log"
     csv_logger = CSVLogger('logs/', name=logger_name)
     log_dir = csv_logger.log_dir
+
+    swan_config = {
+        k: (str(v) if isinstance(v, torch.device) else v)
+        for k, v in vars(args).items()
+    }
+    swan_config.update(config)
+    swanlab_logger = SwanLabLogger(
+        workspace="st2025",
+        project="Causal_Analysis",
+        experiment_name=model_name+"_developing",
+        config=swan_config,
+    )
 
     if int(os.environ.get("LOCAL_RANK", 0)) == 0:
         setup_text_logging(log_dir)
@@ -77,7 +91,7 @@ def main(args):
         devices=devices,
         strategy=strategy,
         callbacks=[checkpoint_callback, early_stop_callback, text_log_callback],
-        logger=csv_logger,
+        logger=[csv_logger, swanlab_logger],
         enable_progress_bar=True,
         use_distributed_sampler=False
     )
