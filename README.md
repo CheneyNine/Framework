@@ -21,7 +21,8 @@ Framework/
 ├── models/                  # Model Layer
 │   ├── base_model.py        # LightningModule base class (Train/Val/Test steps)
 │   ├── builder.py           # Model Factory (initializes models based on config)
-│   └── STGCN.py             # STGCN Network architecture
+│   ├── STGCN.py             # STGCN Network architecture
+│   └── callst.py            # GPT-2 + LoRA causal debiasing model
 │
 ├── utils/                   # Utilities & Helper Functions
 │   ├── config.py            # Config loading and merging logic

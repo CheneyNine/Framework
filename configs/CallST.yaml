@@ -1,0 +1,14 @@
+model:
+  name: CallST
+  stage: pretrain # Initial stage: pretrain, probe, task
+  top_k: 3
+  hidden_channels: 256 # gpt_channel
+  
+train:
+  optimizer:
+    name: Adam
+    lr: 0.001
+  scheduler:
+    name: ReduceLROnPlateau
+    patience: 5
+    monitor: 'val_loss'

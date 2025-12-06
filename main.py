@@ -36,14 +36,17 @@ def main(args):
         for k, v in vars(args).items()
     }
     swan_config.update(config)
-    swanlab_logger = SwanLabLogger(
-        workspace="st2025",
-        project="Causal_Analysis",
-        experiment_name=model_name+"_developing",
-        config=swan_config,
-    )
 
+    loggers = [csv_logger]
     if int(os.environ.get("LOCAL_RANK", 0)) == 0:
+        swanlab_logger = SwanLabLogger(
+            workspace="st2025",
+            project="Causal_Analysis",
+            experiment_name=model_name+"_developing",
+            config=swan_config,
+        )
+        loggers.append(swanlab_logger)
+
         setup_text_logging(log_dir)
         logging.info(f"----- Experiment Configuration -----")
         logging.info(f"Model: {model_name}")
@@ -91,7 +94,7 @@ def main(args):
         devices=devices,
         strategy=strategy,
         callbacks=[checkpoint_callback, early_stop_callback, text_log_callback],
-        logger=[csv_logger, swanlab_logger],
+        logger=loggers,
         enable_progress_bar=True,
         use_distributed_sampler=False
     )
